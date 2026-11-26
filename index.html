@@ -1,0 +1,1306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Echoes of Maria - HD Enhanced Platformer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800;900&family=Inter:wght@300;400;600;800&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #050508;
+            color: #f1f5f9;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        .font-cinzel { font-family: 'Cinzel', serif; }
+
+        .glass-panel {
+            background: rgba(12, 10, 20, 0.88);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.9);
+        }
+
+        .glass-btn {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .glass-btn:hover {
+            background: rgba(239, 68, 68, 0.25);
+            border-color: rgba(239, 68, 68, 0.7);
+            transform: translateY(-2px);
+            box-shadow: 0 0 20px rgba(239, 68, 68, 0.4);
+        }
+
+        .scanline {
+            background: linear-gradient(
+                to bottom,
+                rgba(255,255,255,0),
+                rgba(255,255,255,0) 50%,
+                rgba(0, 0, 0, 0.35) 50%,
+                rgba(0, 0, 0, 0.35)
+            );
+            background-size: 100% 4px;
+            pointer-events: none;
+        }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.4); }
+        ::-webkit-scrollbar-thumb { background: rgba(239, 68, 68, 0.6); border-radius: 3px; }
+    </style>
+</head>
+<body class="w-screen h-screen flex flex-col items-center justify-center relative bg-black text-white overflow-hidden">
+
+    <!-- Scanline Horror Effect -->
+    <div class="scanline absolute inset-0 z-10 pointer-events-none"></div>
+
+    <!-- GAME CANVAS CONTAINER -->
+    <div id="game-wrapper" class="relative w-full h-full max-w-[1280px] max-h-[720px] flex items-center justify-center shadow-2xl rounded-xl overflow-hidden border border-slate-800">
+        
+        <canvas id="gameCanvas" width="1280" height="720" class="w-full h-full object-contain bg-slate-950"></canvas>
+
+        <!-- HUD OVERLAY -->
+        <div id="hud" class="absolute top-0 left-0 w-full p-4 flex justify-between items-start pointer-events-none z-20 hidden">
+            <div class="flex flex-col gap-2">
+                <div class="flex items-center gap-3 bg-black/70 px-4 py-2 rounded-xl border border-red-900/50 backdrop-blur-md">
+                    <i class="fa-solid fa-heart text-red-500 text-xl animate-pulse"></i>
+                    <div class="flex flex-col">
+                        <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Lives</span>
+                        <div id="lives-container" class="flex gap-1.5"></div>
+                    </div>
+                </div>
+
+                <div id="buff-indicator" class="hidden flex items-center gap-2 bg-indigo-950/90 border border-indigo-400/60 px-3.5 py-1.5 rounded-xl backdrop-blur-md text-xs font-semibold text-indigo-200 shadow-lg">
+                    <i id="buff-icon" class="fa-solid fa-bolt text-amber-400 text-sm"></i>
+                    <span id="buff-text">Speed Boost Active</span>
+                </div>
+            </div>
+
+            <div class="bg-black/80 px-6 py-2.5 rounded-2xl border border-slate-700/60 text-center backdrop-blur-md shadow-xl">
+                <div id="level-title" class="text-sm font-cinzel text-red-400 font-extrabold tracking-widest uppercase">Level 1: Midnight Hotel</div>
+                <div id="level-objective" class="text-[11px] text-slate-300 mt-0.5 font-light">Find the letter at the end of the rainy street</div>
+            </div>
+
+            <div class="flex items-center gap-3 pointer-events-auto">
+                <button id="btn-skin-quick" onclick="openSkinMenu()" class="glass-btn px-3.5 py-2 rounded-xl text-xs flex items-center gap-2 font-semibold text-slate-200 shadow-md">
+                    <i class="fa-solid fa-wand-magic-sparkles text-amber-400"></i>
+                    <span id="current-skin-name">Avatar: Leo (Human HD)</span>
+                </button>
+                <button id="btn-pause" onclick="togglePause()" class="glass-btn p-2.5 rounded-xl text-slate-300 hover:text-white">
+                    <i class="fa-solid fa-pause text-lg"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- BOSS HEALTH HUD -->
+        <div id="boss-hud" class="absolute top-16 left-1/2 -translate-x-1/2 w-2/3 max-w-xl bg-black/85 p-3.5 rounded-2xl border border-red-900/80 backdrop-blur-md z-20 hidden shadow-2xl">
+            <div class="flex justify-between items-center mb-1.5">
+                <span class="text-xs font-bold text-red-500 tracking-widest uppercase flex items-center gap-2 font-cinzel">
+                    <i class="fa-solid fa-skull text-sm"></i> Final Boss: Anh Minh (The Impostor Surgeon)
+                </span>
+                <span id="boss-phase-text" class="text-[10px] text-amber-400 font-mono bg-amber-950/70 px-2.5 py-0.5 rounded-md border border-amber-800/50">Phase 1</span>
+            </div>
+            <div class="w-full h-3.5 bg-slate-900 rounded-full overflow-hidden border border-slate-700">
+                <div id="boss-hp-bar" class="h-full bg-gradient-to-r from-red-800 via-rose-500 to-red-600 transition-all duration-200" style="width: 100%;"></div>
+            </div>
+        </div>
+
+        <!-- CUTSCENE & STORY OVERLAY -->
+        <div id="story-overlay" class="absolute inset-0 bg-black/92 z-30 flex flex-col justify-between p-8 md:p-12 transition-opacity duration-500 hidden">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-4">
+                <div class="flex items-center gap-3">
+                    <span id="story-chapter-tag" class="px-3 py-1 bg-red-950/90 border border-red-700/60 text-red-400 text-xs font-bold rounded-full uppercase tracking-wider">Night of Memories</span>
+                    <h2 id="story-title" class="text-xl md:text-2xl font-cinzel text-slate-100 font-bold">Echoes of Maria</h2>
+                </div>
+                <button onclick="skipCutscene()" class="text-xs text-slate-400 hover:text-slate-100 uppercase tracking-widest flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg glass-btn">
+                    <span>Skip</span> <i class="fa-solid fa-forward text-[10px]"></i>
+                </button>
+            </div>
+
+            <div class="my-auto flex flex-col md:flex-row items-center gap-8 max-w-4xl mx-auto">
+                <div id="story-avatar" class="w-32 h-32 md:w-40 md:h-40 rounded-2xl border-2 border-red-800/60 bg-slate-900 flex-shrink-0 overflow-hidden flex items-center justify-center shadow-2xl">
+                    <i class="fa-solid fa-user-ghost text-5xl text-slate-500"></i>
+                </div>
+                <div class="flex-1 text-center md:text-left">
+                    <h3 id="story-speaker" class="text-lg font-bold text-red-400 mb-2 font-cinzel">Leo (Age 20)</h3>
+                    <p id="story-text" class="text-slate-300 text-sm md:text-base leading-relaxed font-light italic">
+                        "After the mysterious deaths of my father and uncle, I comforted my little sister Maria with hide-and-seek..."
+                    </p>
+                </div>
+            </div>
+
+            <div class="flex justify-between items-center border-t border-slate-800 pt-4">
+                <div id="story-progress-dots" class="flex gap-2"></div>
+                <button id="story-next-btn" onclick="nextStorySlide()" class="px-6 py-2.5 bg-red-700 hover:bg-red-600 text-white font-semibold rounded-xl text-sm flex items-center gap-2 shadow-lg shadow-red-950/60 transition-all font-cinzel">
+                    <span>Continue</span> <i class="fa-solid fa-arrow-right text-xs"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- MAIN MENU -->
+        <div id="main-menu" class="absolute inset-0 bg-slate-950 z-40 flex flex-col items-center justify-center p-6 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900 via-slate-950 to-black">
+            <div class="text-center max-w-2xl mx-auto">
+                <div class="mb-3 inline-block px-3.5 py-1 bg-red-950/70 border border-red-800/60 rounded-full text-red-400 text-xs font-bold uppercase tracking-widest">
+                    HD Vector Graphics & Psychological Thriller Platformer
+                </div>
+                <h1 class="text-4xl md:text-6xl font-cinzel font-black text-transparent bg-clip-text bg-gradient-to-r from-red-600 via-rose-400 to-slate-100 drop-shadow-2xl mb-4">
+                    ECHOES OF MARIA
+                </h1>
+                <p class="text-slate-400 text-xs md:text-sm max-w-lg mx-auto mb-8 font-light leading-relaxed">
+                    A ten-year search for a vanished sister. Uncover the horrifying truth behind your family's deaths and confront the impostor, Anh Minh.
+                </p>
+
+                <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
+                    <button onclick="startNewGame()" class="w-48 py-3.5 bg-red-700 hover:bg-red-600 text-white font-bold rounded-xl shadow-xl shadow-red-950/60 hover:shadow-red-600/50 transition-all flex items-center justify-center gap-2 font-cinzel">
+                        <i class="fa-solid fa-play text-sm"></i> Play Story
+                    </button>
+                    <button onclick="openLevelSelect()" class="w-48 py-3.5 glass-btn text-slate-200 font-semibold rounded-xl flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-map text-sm text-red-400"></i> Select Level
+                    </button>
+                    <button onclick="openSkinMenu()" class="w-48 py-3.5 glass-btn text-slate-200 font-semibold rounded-xl flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-shirt text-sm text-amber-400"></i> Change Skin
+                    </button>
+                </div>
+            </div>
+
+            <div class="absolute bottom-6 flex flex-wrap justify-center gap-4 md:gap-6 text-xs text-slate-500 bg-black/50 px-6 py-2 rounded-full border border-slate-800">
+                <span><kbd class="px-1.5 py-0.5 bg-slate-800 text-slate-300 rounded text-[10px]">A / D / ← →</kbd> Move</span>
+                <span><kbd class="px-1.5 py-0.5 bg-slate-800 text-slate-300 rounded text-[10px]">Space / W / ↑</kbd> Jump (Double Jump)</span>
+                <span><kbd class="px-1.5 py-0.5 bg-slate-800 text-slate-300 rounded text-[10px]">Shift</kbd> Dash</span>
+                <span><kbd class="px-1.5 py-0.5 bg-slate-800 text-slate-300 rounded text-[10px]">P</kbd> Pause</span>
+            </div>
+        </div>
+
+        <!-- LEVEL MODAL -->
+        <div id="level-modal" class="absolute inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-6 hidden">
+            <div class="glass-panel p-6 md:p-8 rounded-2xl max-w-2xl w-full border border-slate-700">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-cinzel font-bold text-red-400">Select Chapter</h3>
+                    <button onclick="closeModal('level-modal')" class="text-slate-400 hover:text-white p-1"><i class="fa-solid fa-xmark text-xl"></i></button>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="level-list-container"></div>
+            </div>
+        </div>
+
+        <!-- SKIN MODAL -->
+        <div id="skin-modal" class="absolute inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-6 hidden">
+            <div class="glass-panel p-6 md:p-8 rounded-2xl max-w-3xl w-full border border-slate-700">
+                <div class="flex justify-between items-center mb-6">
+                    <div>
+                        <h3 class="text-xl font-cinzel font-bold text-amber-400">HD Character & Animal Skins</h3>
+                        <p class="text-xs text-slate-400">High-definition vector sprites with custom animations and aura trails</p>
+                    </div>
+                    <button onclick="closeModal('skin-modal')" class="text-slate-400 hover:text-white p-1"><i class="fa-solid fa-xmark text-xl"></i></button>
+                </div>
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-[380px] overflow-y-auto p-1" id="skin-grid"></div>
+            </div>
+        </div>
+
+        <!-- PAUSE MODAL -->
+        <div id="pause-modal" class="absolute inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-6 hidden">
+            <div class="glass-panel p-8 rounded-2xl max-w-md w-full text-center border border-slate-700">
+                <h3 id="pause-title" class="text-2xl font-cinzel font-bold text-slate-100 mb-2">Game Paused</h3>
+                <p id="pause-desc" class="text-xs text-slate-400 mb-6">Steel your nerves before facing the dark truth.</p>
+
+                <div class="flex flex-col gap-3">
+                    <button id="btn-resume" onclick="togglePause()" class="py-3 bg-red-700 hover:bg-red-600 text-white font-bold rounded-xl text-sm transition-all font-cinzel">Resume</button>
+                    <button onclick="restartCurrentLevel()" class="py-3 glass-btn text-slate-200 font-semibold rounded-xl text-sm">Restart Level</button>
+                    <button onclick="returnToMainMenu()" class="py-3 glass-btn text-slate-400 hover:text-red-400 font-semibold rounded-xl text-sm">Return to Main Menu</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        /* ==========================================================================
+           AUDIO & GAME CONFIGURATION
+           ========================================================================== */
+        class SoundEngine {
+            constructor() { this.ctx = null; this.muted = false; }
+            init() { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); }
+            playTone(freq, type, duration, vol = 0.1) {
+                if (this.muted) return;
+                try {
+                    this.init();
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                    gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + duration);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + duration);
+                } catch (e) {}
+            }
+            playJump() { this.playTone(340, 'sine', 0.15, 0.12); setTimeout(() => this.playTone(520, 'sine', 0.12, 0.08), 40); }
+            playDash() { this.playTone(190, 'triangle', 0.1, 0.15); this.playTone(95, 'sawtooth', 0.15, 0.1); }
+            playPowerup() { this.playTone(440, 'sine', 0.1, 0.1); setTimeout(() => this.playTone(660, 'sine', 0.1, 0.1), 80); setTimeout(() => this.playTone(880, 'triangle', 0.2, 0.12), 160); }
+            playHurt() { this.playTone(140, 'sawtooth', 0.2, 0.2); this.playTone(70, 'square', 0.25, 0.15); }
+            playBossAttack() { this.playTone(240, 'sawtooth', 0.2, 0.15); setTimeout(() => this.playTone(120, 'sawtooth', 0.3, 0.2), 100); }
+        }
+
+        const sound = new SoundEngine();
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        /* ==========================================================================
+           CHARACTER SKINS DATABASE (11 HD Vector Skins)
+           ========================================================================== */
+        const SKINS = [
+            { id: 'human', name: 'Leo (Human HD)', icon: 'fa-user-ninja', color: '#ef4444', secondary: '#1e293b' },
+            { id: 'dog', name: 'Doberman Dog', icon: 'fa-dog', color: '#d97706', secondary: '#451a03' },
+            { id: 'cat', name: 'Midnight Black Cat', icon: 'fa-cat', color: '#475569', secondary: '#0f172a' },
+            { id: 'pig', name: 'Armored Boar Pig', icon: 'fa-piggy-bank', color: '#f472b6', secondary: '#9d174d' },
+            { id: 'chicken', name: 'Battle Rooster', icon: 'fa-feather', color: '#facc15', secondary: '#dc2626' },
+            { id: 'rabbit', name: 'Swift Snow Rabbit', icon: 'fa-rabbit', color: '#f8fafc', secondary: '#fda4af' },
+            { id: 'croc', name: 'Swamp Crocodile', icon: 'fa-dragon', color: '#15803d', secondary: '#052e16' },
+            { id: 'shark', name: 'Abyssal Shark', icon: 'fa-fish-fins', color: '#0284c7', secondary: '#0c4a6e' },
+            { id: 'whale', name: 'Deep Blue Whale', icon: 'fa-shield-halved', color: '#2563eb', secondary: '#1e3a8a' },
+            { id: 'seahorse', name: 'Memory Seahorse', icon: 'fa-water', color: '#0d9488', secondary: '#134e4a' },
+            { id: 'dino', name: 'Tyrannosaurus Rex', icon: 'fa-skull', color: '#16a34a', secondary: '#14532d' }
+        ];
+
+        let currentSkin = SKINS[0];
+
+        /* ==========================================================================
+           CUTSCENE SCRIPTS & STORYLINE
+           ========================================================================== */
+        const STORY_SCRIPTS = {
+            intro: [
+                {
+                    speaker: 'Leo (Age 10)',
+                    text: 'After the mysterious deaths of my father and my second uncle, I tried to cheer up my little sister, Maria, by playing hide-and-seek. She loved that game—and she won every single time, leaving me frustrated, yet I kept playing just to make her smile.',
+                    tag: 'Fading Childhood'
+                },
+                {
+                    speaker: 'Leo (Age 10)',
+                    text: 'Then one day, Maria vanished without a trace. Two months later, she suddenly returned—with hollow, lifeless eyes. I had no proof, yet deep down I felt she had become a completely different person.',
+                    tag: 'The Hollow Return'
+                },
+                {
+                    speaker: 'Leo (Age 20)',
+                    text: 'Seeing her sorrowful face back then, I suggested another round of hide-and-seek... Ten years passed. From age 10 to 20, half a lifetime gone, I still never found her. I forgot the sound of her voice, her personality, her face—everything Maria was.',
+                    tag: 'Ten Years Lost'
+                },
+                {
+                    speaker: 'Anonymous Letter (12:00 AM)',
+                    text: '"Leo, you traitor. You abandoned Maria and stopped looking for her. Within 21 days, return to your old family house to find her—or she will vanish again. Not for a month, not for ten years, but FOREVER. Maria will DIE."',
+                    tag: 'The Midnight Threat'
+                },
+                {
+                    speaker: 'Leo (Age 20)',
+                    text: 'The old house... I avoided it for five years. Ever since Maria returned from that first disappearance, everyone on my father\'s side died one by one—my grandparents, my father, my uncle. All DEAD. This time, I will NOT lose Maria.',
+                    tag: 'Into the Shadows'
+                }
+            ],
+            preLevel5: [
+                {
+                    speaker: 'Leo (Old House Basement)',
+                    text: 'These surgical blueprints... scalpels stained with dried blood... plastic surgery records?! What is this place?!',
+                    tag: 'The Horrifying Truth'
+                },
+                {
+                    speaker: 'Anh Minh (The Impostor)',
+                    text: 'You finally realized, Leo? That letter was bait to lure you back here! The real Maria DIED at age 8 the very day she disappeared. Because of my petite frame, I underwent plastic surgery to take her face!',
+                    tag: 'Unmasked'
+                },
+                {
+                    speaker: 'Anh Minh',
+                    text: 'I am your late mother\'s ex-girlfriend—the mother your father beat to death when you were just a child! When I heard she died, I swore to slaughter every drop of your father\'s bloodline. Your grandparents, your father, your uncle—all dead by my hand!',
+                    tag: 'Blood Vengeance'
+                },
+                {
+                    speaker: 'Anh Minh',
+                    text: 'You slipped through my fingers when you were ten... but tonight, the last heir of that monster\'s bloodline DIES HERE!',
+                    tag: 'Final Confrontation'
+                }
+            ],
+            outro: [
+                {
+                    speaker: 'Leo (Escaped)',
+                    text: 'Breaking free from the chains, Leo escaped the crumbling house and reported everything to the police. Anh Minh was finally arrested to answer for her crimes.',
+                    tag: 'Chains Broken'
+                },
+                {
+                    speaker: 'Leo (Aftermath)',
+                    text: 'Haunted by severe psychological trauma, Leo was forced to resign from his job to recover—yet for the first time in a decade, the suffocating guilt began to lift.',
+                    tag: 'Healing'
+                },
+                {
+                    speaker: 'Rainy Cemetery',
+                    text: 'Kneeling beside the graves of his mother and little sister Maria, Leo lights sticks of incense in the quiet mist. "Rest peacefully now... it\'s finally over."',
+                    tag: 'Ending'
+                }
+            ]
+        };
+
+        const LEVELS = [
+            { id: 1, name: 'Level 1: Midnight Hotel & Rainy Streets', desc: '12:00 AM. A chilling letter arrives outside your business hotel.', bgGradient: ['#0f172a', '#020617'], rain: true, objective: 'Reach the letter at the end of the rainy street', spawn: { x: 80, y: 550 }, exit: { x: 1180, y: 550, width: 40, height: 60 } },
+            { id: 2, name: 'Level 2: Overgrown Forest Path', desc: 'The dark woodland trail leading back to your childhood home.', bgGradient: ['#052e16', '#020617'], rain: false, objective: 'Cross the thorny abyss toward the old house', spawn: { x: 80, y: 550 }, exit: { x: 1200, y: 200, width: 40, height: 60 } },
+            { id: 3, name: 'Level 3: Haunted Mansion Corridors', desc: 'Spinning blades and suffocating memories echo down the halls.', bgGradient: ['#31102f', '#09020d'], rain: false, objective: 'Find the hidden staircase to the basement', spawn: { x: 80, y: 550 }, exit: { x: 1180, y: 150, width: 40, height: 60 } },
+            { id: 4, name: 'Level 4: Dark Basement & Torture Chamber', desc: 'Where bloodstains and surgical secrets lie buried.', bgGradient: ['#450a0a', '#090202'], rain: false, objective: 'Reach the deepest chamber of the cellar', spawn: { x: 80, y: 150 }, exit: { x: 1180, y: 580, width: 40, height: 60 } },
+            { id: 5, name: 'Level 5: Final Boss Arena - Anh Minh', desc: 'Survive Anh Minh\'s surgical blades and lasers to escape!', bgGradient: ['#2e0854', '#080114'], rain: false, isBoss: true, objective: 'Defeat Anh Minh', spawn: { x: 150, y: 550 }, exit: null }
+        ];
+
+        let currentSkin = SKINS[0];
+
+        /* ==========================================================================
+           CUTSCENE SCRIPTS & STORYLINE
+           ========================================================================== */
+        const STORY_SCRIPTS = {
+            intro: [
+                { speaker: 'Leo (Năm 10 tuổi)', text: 'Sau cái chết bí ẩn của cha và chú hai, tôi dỗ dành Maria bằng trò chơi trốn tìm. Cậu nhớ em gái rất thích trò này nhưng cậu toàn thua...', tag: 'Ký ức xa xăm' },
+                { speaker: 'Leo (Năm 10 tuổi)', text: 'Vì chiều em, cậu vẫn chơi cho đến một ngày Maria bỗng biến mất không dấu vết. 2 tháng sau, cô bé trở về với đôi mắt vô hồn...', tag: 'Sự trở về bí ẩn' },
+                { speaker: 'Leo (Năm 20 tuổi)', text: 'Thấy em buồn rầu, Leo lại gợi ý chơi trốn tìm... 10 năm trôi qua, từ 10 đến 20 tuổi, cậu vẫn không tìm thấy Maria thật sự. Cậu đã quên đi giọng nói, tính cách và gương mặt em...', tag: '10 Năm Đau Đổ' },
+                { speaker: 'Bức Thư Kỳ Quái (12h Đêm)', text: '"Leo, cậu là kẻ phản bội! 21 ngày nữa hãy quay lại căn nhà cũ, nếu không Maria sẽ biến mất MÃI MÃI. Maria sẽ CHẾT!"', tag: 'Bức thư đe dọa' },
+                { speaker: 'Leo (20 tuổi)', text: 'Căn nhà cũ... Nơi ông bà, ba và chú hai lần lượt ĐỘT TỬ sau khi Maria trở về. Cậu vốn trốn tránh 5 năm nay, nhưng lần này cậu sẽ KHÔNG để mất Maria nữa!', tag: 'Dấn thân vào bóng tối' }
+            ],
+            preLevel5: [
+                { speaker: 'Leo (Hầm Căn Nhà Cũ)', text: 'Những bức ảnh phẫu thuật thẩm mỹ này... Dao mổ, găng tay y tế phủ máu... Là sao?', tag: 'Sự Thật Trần Trụi' },
+                { speaker: 'Ánh Minh (Trùm Mạo Danh)', text: 'Maria thật đã CHẾT từ năm 8 tuổi ngay khi mất tích! Ta phẫu thuật thẩm mỹ thành Maria để giết hết máu mủ dòng họ nhà ba cậu vì mẹ cậu đã chết do bị cha cậu bạo hành!', tag: 'Thân phận tiết lộ' },
+                { speaker: 'Ánh Minh', text: 'Ông bà, ba, chú hai đã đền tội! Năm 10 tuổi cậu chạy thoát được... nhưng lần này CẬU SẼ PHẢI CHẾT!', tag: 'Tuyên chiến' }
+            ],
+            outro: [
+                { speaker: 'Leo (Thoát Nạn)', text: 'Leo thoát khỏi xiềng xích, trốn khỏi căn nhà rực cháy và báo án. Ánh Minh đã bị bắt giữ trả giá cho toàn bộ tội ác.', tag: 'Khép Lại Ám Ảnh' },
+                { speaker: 'Leo (Sau Biến Cố)', text: 'Biến cố tâm lý quá lớn buộc Leo phải nghỉ làm để điều trị. Nhưng tâm trí cậu cuối cùng cũng đã tìm lại được sự bình yên...', tag: 'Chữa Lành' },
+                { speaker: 'Nghĩa Trang Mưa Chiều', text: 'Leo thắp nhang bên ngôi mộ của Mẹ và em gái Maria nhỏ bé... "Hãy yên nghỉ nhé, mọi chuyện kết thúc rồi."', tag: 'Kết Thúc' }
+            ]
+        };
+
+        const LEVELS = [
+            { id: 1, name: 'Màn 1: Căn Khách Sạn & Đêm Mưa', desc: 'Lúc 12h đêm nhận thư. Bắt đầu hành trình chạy thoát khỏi bóng đen.', bgGradient: ['#0f172a', '#020617'], rain: true, objective: 'Đến bức thư ở cuối góc phố', spawn: { x: 80, y: 550 }, exit: { x: 1180, y: 550, width: 40, height: 60 } },
+            { id: 2, name: 'Màn 2: Rừng Rậm Dẫn Về Nhà Cũ', desc: 'Con đường rừng u uất đầy gai nhọn và vực thẳm.', bgGradient: ['#052e16', '#020617'], rain: false, objective: 'Vượt rừng gai để vào căn nhà cũ', spawn: { x: 80, y: 550 }, exit: { x: 1200, y: 200, width: 40, height: 60 } },
+            { id: 3, name: 'Màn 3: Hành Lang Dinh Thự U Uất', desc: 'Lưỡi cưa xoay rùng rợn và bóng ma quá khứ.', bgGradient: ['#31102f', '#09020d'], rain: false, objective: 'Tìm lối xuống tầng hầm bí mật', spawn: { x: 80, y: 550 }, exit: { x: 1180, y: 150, width: 40, height: 60 } },
+            { id: 4, name: 'Màn 4: Tầng Hầm Tra Tấn Bị Khóa', desc: 'Nơi chôn giấu vết máu và sự thật tàn khốc.', bgGradient: ['#450a0a', '#090202'], rain: false, objective: 'Đến tận cùng hầm tối', spawn: { x: 80, y: 150 }, exit: { x: 1180, y: 580, width: 40, height: 60 } },
+            { id: 5, name: 'Màn 5: Trận Chiến Cuối Cùng - Ánh Minh', desc: 'Đánh bại Bác sĩ mạo danh Ánh Minh!', bgGradient: ['#2e0854', '#080114'], rain: false, isBoss: true, objective: 'Hạ gục Ánh Minh', spawn: { x: 150, y: 550 }, exit: null }
+        ];
+
+        let currentLevelIdx = 0;
+        let gameState = 'MENU';
+        let currentCutsceneKey = 'intro';
+        let cutsceneStep = 0;
+        let lives = 5;
+        let screenShakeTime = 0;
+        let animFrameCounter = 0;
+
+        const keys = { left: false, right: false, jump: false, dash: false };
+
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'KeyA' || e.code === 'ArrowLeft') keys.left = true;
+            if (e.code === 'KeyD' || e.code === 'ArrowRight') keys.right = true;
+            if (e.code === 'KeyW' || e.code === 'Space' || e.code === 'ArrowUp') {
+                if (!keys.jump) player.requestJump();
+                keys.jump = true;
+            }
+            if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+                if (!keys.dash) player.requestDash();
+                keys.dash = true;
+            }
+            if (e.code === 'KeyP') togglePause();
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.code === 'KeyA' || e.code === 'ArrowLeft') keys.left = false;
+            if (e.code === 'KeyD' || e.code === 'ArrowRight') keys.right = false;
+            if (e.code === 'KeyW' || e.code === 'Space' || e.code === 'ArrowUp') keys.jump = false;
+            if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') keys.dash = false;
+        });
+
+        /* ==========================================================================
+           HIGH-DEFINITION VECTOR CHARACTER RENDERER
+           ========================================================================== */
+        class Player {
+            constructor() {
+                this.x = 100; this.y = 500;
+                this.width = 32; this.height = 48;
+                this.vx = 0; this.vy = 0;
+                this.speed = 5.4;
+                this.jumpForce = 12.5;
+                this.grounded = false;
+                this.doubleJumpAvailable = true;
+                this.canDash = true;
+                this.isDashing = false;
+                this.dashTimer = 0;
+                this.facing = 'right';
+
+                this.activeBuff = null;
+                this.buffTimer = 0;
+                this.scale = 1;
+                this.trail = []; // Dash & speed trail ghost particles
+            }
+
+            reset(x, y) {
+                this.x = x; this.y = y;
+                this.vx = 0; this.vy = 0;
+                this.grounded = false;
+                this.doubleJumpAvailable = true;
+                this.canDash = true;
+                this.isDashing = false;
+                this.activeBuff = null;
+                this.buffTimer = 0;
+                this.scale = 1;
+                this.width = 32; this.height = 48;
+                this.trail = [];
+            }
+
+            applyBuff(type, durationSec = 6) {
+                this.activeBuff = type;
+                this.buffTimer = durationSec * 60;
+                sound.playPowerup();
+
+                const buffInd = document.getElementById('buff-indicator');
+                const buffText = document.getElementById('buff-text');
+                buffInd.classList.remove('hidden');
+
+                if (type === 'SPEED') buffText.innerText = 'Speed Boost Active!';
+                if (type === 'HIGH_JUMP') buffText.innerText = 'Super High Jump!';
+                if (type === 'SHRINK') { buffText.innerText = 'Micro Shrink Active!'; this.scale = 0.6; }
+                if (type === 'GROW') { buffText.innerText = 'Colossal Giant Form!'; this.scale = 1.6; }
+                if (type === 'FLY') buffText.innerText = 'Gravity Flight Active!';
+
+                this.width = 32 * this.scale;
+                this.height = 48 * this.scale;
+            }
+
+            requestJump() {
+                if (gameState !== 'PLAYING') return;
+                if (this.activeBuff === 'FLY') {
+                    this.vy = -7.5;
+                    sound.playJump();
+                    return;
+                }
+                if (this.grounded) {
+                    const jumpVal = (this.activeBuff === 'HIGH_JUMP') ? this.jumpForce * 1.5 : this.jumpForce;
+                    this.vy = -jumpVal;
+                    this.grounded = false;
+                    sound.playJump();
+                    createParticles(this.x + this.width/2, this.y + this.height, '#ffffff', 10);
+                } else if (this.doubleJumpAvailable) {
+                    const jumpVal = (this.activeBuff === 'HIGH_JUMP') ? this.jumpForce * 1.3 : this.jumpForce * 0.95;
+                    this.vy = -jumpVal;
+                    this.doubleJumpAvailable = false;
+                    sound.playJump();
+                    createParticles(this.x + this.width/2, this.y + this.height/2, '#38bdf8', 12);
+                }
+            }
+
+            requestDash() {
+                if (gameState !== 'PLAYING') return;
+                if (this.canDash && !this.isDashing) {
+                    this.isDashing = true;
+                    this.dashTimer = 14;
+                    this.canDash = false;
+                    sound.playDash();
+                    createParticles(this.x + this.width/2, this.y + this.height/2, '#ef4444', 15);
+                }
+            }
+
+            update(platforms) {
+                if (this.buffTimer > 0) {
+                    this.buffTimer--;
+                    if (this.buffTimer <= 0) {
+                        this.activeBuff = null;
+                        this.scale = 1;
+                        this.width = 32; this.height = 48;
+                        document.getElementById('buff-indicator').classList.add('hidden');
+                    }
+                }
+
+                let curSpeed = (this.activeBuff === 'SPEED') ? this.speed * 1.8 : this.speed;
+
+                if (this.isDashing) {
+                    this.vx = (this.facing === 'right' ? 1 : -1) * (curSpeed * 2.8);
+                    this.vy = 0;
+                    this.dashTimer--;
+                    if (this.dashTimer <= 0) this.isDashing = false;
+                } else {
+                    if (keys.left) { this.vx = -curSpeed; this.facing = 'left'; }
+                    else if (keys.right) { this.vx = curSpeed; this.facing = 'right'; }
+                    else { this.vx *= 0.76; }
+
+                    if (this.activeBuff !== 'FLY') this.vy += 0.58;
+                    else this.vy *= 0.82;
+                }
+
+                // Add trail particles for motion graphics
+                if (Math.abs(this.vx) > 3 || this.isDashing || this.activeBuff) {
+                    this.trail.push({
+                        x: this.x + this.width/2,
+                        y: this.y + this.height/2,
+                        scale: this.scale,
+                        facing: this.facing,
+                        alpha: 0.6
+                    });
+                    if (this.trail.length > 8) this.trail.shift();
+                }
+
+                this.x += this.vx;
+                platforms.forEach(p => {
+                    if (this.checkCollision(p)) {
+                        if (this.vx > 0) this.x = p.x - this.width;
+                        else if (this.vx < 0) this.x = p.x + p.width;
+                    }
+                });
+
+                this.y += this.vy;
+                this.grounded = false;
+                platforms.forEach(p => {
+                    if (this.checkCollision(p)) {
+                        if (this.vy > 0) {
+                            this.y = p.y - this.height;
+                            this.vy = 0;
+                            this.grounded = true;
+                            this.doubleJumpAvailable = true;
+                            this.canDash = true;
+                        } else if (this.vy < 0) {
+                            this.y = p.y + p.height;
+                            this.vy = 0;
+                        }
+                    }
+                });
+
+                if (this.x < 0) this.x = 0;
+                if (this.x + this.width > canvas.width) this.x = canvas.width - this.width;
+
+                if (this.y > canvas.height + 100) {
+                    handlePlayerDeath('You fell into the endless abyss!');
+                }
+            }
+
+            checkCollision(rect) {
+                return (
+                    this.x < rect.x + rect.width &&
+                    this.x + this.width > rect.x &&
+                    this.y < rect.y + rect.height &&
+                    this.y + this.height > rect.y
+                );
+            }
+
+            draw() {
+                // Render Trail Effects
+                this.trail.forEach((t, i) => {
+                    t.alpha -= 0.07;
+                    if (t.alpha > 0) {
+                        ctx.save();
+                        ctx.globalAlpha = t.alpha;
+                        ctx.translate(t.x, t.y);
+                        if (t.facing === 'left') ctx.scale(-1, 1);
+                        drawHDVectorCharacter(ctx, currentSkin, this.width, this.height, false, true, animFrameCounter);
+                        ctx.restore();
+                    }
+                });
+
+                // Aura Glow around character when activeBuff is on
+                if (this.activeBuff) {
+                    ctx.save();
+                    ctx.translate(this.x + this.width/2, this.y + this.height/2);
+                    const auraGlow = ctx.createRadialGradient(0, 0, 5, 0, 0, this.width * 1.5);
+                    auraGlow.addColorStop(0, 'rgba(251, 191, 36, 0.6)');
+                    auraGlow.addColorStop(1, 'rgba(251, 191, 36, 0)');
+                    ctx.fillStyle = auraGlow;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, this.width * 1.5, 0, Math.PI*2);
+                    ctx.fill();
+                    ctx.restore();
+                }
+
+                // Main Character Render
+                ctx.save();
+                ctx.translate(this.x + this.width/2, this.y + this.height/2);
+                if (this.facing === 'left') ctx.scale(-1, 1);
+
+                const isMoving = Math.abs(this.vx) > 0.5;
+                drawHDVectorCharacter(ctx, currentSkin, this.width, this.height, isMoving, this.isDashing, animFrameCounter);
+
+                ctx.restore();
+            }
+        }
+
+        const player = new Player();
+
+        /* ==========================================================================
+           ULTRA HD VECTOR CHARACTER GRAPHICS ENGINE
+           ========================================================================== */
+        function drawHDVectorCharacter(ctx, skin, w, h, isMoving, isDashing, frame) {
+            const cycle = Math.sin(frame * 0.2); // Breathing / Running cycle
+            const legAngle = isMoving ? Math.sin(frame * 0.3) * 0.6 : 0;
+            const armAngle = isMoving ? -Math.sin(frame * 0.3) * 0.5 : 0;
+
+            ctx.shadowBlur = isDashing ? 20 : 8;
+            ctx.shadowColor = skin.color;
+
+            // 1. HUMAN LEO HD SKIN
+            if (skin.id === 'human') {
+                // Shadow underneath
+                ctx.fillStyle = 'rgba(0,0,0,0.3)';
+                ctx.beginPath();
+                ctx.ellipse(0, h/2 - 2, w*0.4, 4, 0, 0, Math.PI*2);
+                ctx.fill();
+
+                // Legs (Pants)
+                ctx.strokeStyle = '#1e293b';
+                ctx.lineWidth = 5;
+                ctx.lineCap = 'round';
+                // Left Leg
+                ctx.beginPath();
+                ctx.moveTo(-4, h*0.1);
+                ctx.lineTo(-6 + Math.sin(legAngle)*8, h*0.45);
+                ctx.stroke();
+                // Right Leg
+                ctx.beginPath();
+                ctx.moveTo(4, h*0.1);
+                ctx.lineTo(6 - Math.sin(legAngle)*8, h*0.45);
+                ctx.stroke();
+
+                // Trench Coat / Jacket Body
+                ctx.fillStyle = '#ef4444';
+                ctx.beginPath();
+                ctx.roundRect(-w*0.35, -h*0.2, w*0.7, h*0.4, 6);
+                ctx.fill();
+
+                // Collar & Belt Detail
+                ctx.fillStyle = '#991b1b';
+                ctx.fillRect(-w*0.35, -h*0.2, w*0.7, 5);
+                ctx.fillStyle = '#0f172a';
+                ctx.fillRect(-w*0.3, h*0.1, w*0.6, 4); // Belt
+
+                // Backpack
+                ctx.fillStyle = '#78350f';
+                ctx.beginPath();
+                ctx.roundRect(-w*0.48, -h*0.15, 8, h*0.3, 3);
+                ctx.fill();
+
+                // Head
+                ctx.fillStyle = '#fca5a5'; // Skin tone
+                ctx.beginPath();
+                ctx.arc(0, -h*0.28, w*0.3, 0, Math.PI*2);
+                ctx.fill();
+
+                // Stylish Hair (Layered Vector)
+                ctx.fillStyle = '#451a03';
+                ctx.beginPath();
+                ctx.arc(0, -h*0.32, w*0.32, Math.PI, Math.PI*2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.moveTo(-w*0.3, -h*0.32);
+                ctx.lineTo(-w*0.1, -h*0.42);
+                ctx.lineTo(w*0.2, -h*0.35);
+                ctx.lineTo(w*0.35, -h*0.28);
+                ctx.fill();
+
+                // Eyes & Expression
+                ctx.fillStyle = '#000000';
+                ctx.beginPath();
+                ctx.arc(w*0.12, -h*0.28, 2.5, 0, Math.PI*2);
+                ctx.fill();
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(w*0.14, -h*0.3, 1, 0, Math.PI*2);
+                ctx.fill();
+
+                // Arms (Jacket sleeves)
+                ctx.strokeStyle = '#dc2626';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.moveTo(-w*0.1, -h*0.1);
+                ctx.lineTo(w*0.2 + Math.sin(armAngle)*10, h*0.15);
+                ctx.stroke();
+            } 
+            
+            // 2. ALL HD ANIMAL SKINS
+            else {
+                // Base Body Vector Gradient
+                const bodyGrad = ctx.createLinearGradient(0, -h/2, 0, h/2);
+                bodyGrad.addColorStop(0, skin.color);
+                bodyGrad.addColorStop(1, skin.secondary);
+                ctx.fillStyle = bodyGrad;
+
+                // Animal Main Torso
+                ctx.beginPath();
+                ctx.roundRect(-w*0.4, -h*0.35, w*0.8, h*0.7, 12);
+                ctx.fill();
+
+                // Legs / Paws / Fins
+                ctx.fillStyle = skin.secondary;
+                for (let i = -1; i <= 1; i += 2) {
+                    const legX = i * (w * 0.25);
+                    const offset = i * Math.sin(legAngle) * 6;
+                    ctx.beginPath();
+                    ctx.arc(legX + offset, h*0.35, 5, 0, Math.PI*2);
+                    ctx.fill();
+                }
+
+                // Bright Shiny Eyes
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(w*0.18, -h*0.12, 5, 0, Math.PI*2);
+                ctx.fill();
+                ctx.fillStyle = '#0f172a';
+                ctx.beginPath();
+                ctx.arc(w*0.22, -h*0.12, 2.5, 0, Math.PI*2);
+                ctx.fill();
+                ctx.fillStyle = '#ffffff'; // Reflection
+                ctx.beginPath();
+                ctx.arc(w*0.24, -h*0.15, 1, 0, Math.PI*2);
+                ctx.fill();
+
+                // Animal Specific High-Detail Features
+                if (skin.id === 'dog') {
+                    // Doberman ears
+                    ctx.fillStyle = skin.secondary;
+                    ctx.beginPath();
+                    ctx.moveTo(-w*0.2, -h*0.35);
+                    ctx.lineTo(-w*0.1, -h*0.55);
+                    ctx.lineTo(0, -h*0.35);
+                    ctx.fill();
+                } else if (skin.id === 'cat') {
+                    // Pointy ears & tail
+                    ctx.fillStyle = skin.color;
+                    ctx.beginPath(); ctx.moveTo(-w*0.3, -h*0.35); ctx.lineTo(-w*0.2, -h*0.52); ctx.lineTo(-w*0.05, -h*0.35); ctx.fill();
+                    ctx.beginPath(); ctx.moveTo(w*0.05, -h*0.35); ctx.lineTo(w*0.2, -h*0.52); ctx.lineTo(w*0.3, -h*0.35); ctx.fill();
+                    // Tail wagging
+                    ctx.strokeStyle = skin.color; ctx.lineWidth = 4;
+                    ctx.beginPath(); ctx.moveTo(-w*0.35, h*0.2); ctx.quadraticCurveTo(-w*0.6, h*0.1 + cycle*5, -w*0.5, -h*0.1); ctx.stroke();
+                } else if (skin.id === 'pig') {
+                    // Pink snout
+                    ctx.fillStyle = '#f472b6';
+                    ctx.beginPath(); ctx.roundRect(w*0.1, -h*0.05, 10, 7, 3); ctx.fill();
+                } else if (skin.id === 'chicken') {
+                    // Red Crest & Beak
+                    ctx.fillStyle = '#dc2626';
+                    ctx.beginPath(); ctx.arc(0, -h*0.42, 6, 0, Math.PI*2); ctx.fill();
+                    ctx.fillStyle = '#f59e0b';
+                    ctx.beginPath(); ctx.moveTo(w*0.3, -h*0.1); ctx.lineTo(w*0.5, 0); ctx.lineTo(w*0.3, h*0.1); ctx.fill();
+                } else if (skin.id === 'rabbit') {
+                    // Long Ears
+                    ctx.fillStyle = '#fda4af';
+                    ctx.beginPath(); ctx.roundRect(-w*0.2, -h*0.65 + cycle*2, 6, 18, 3); ctx.fill();
+                    ctx.beginPath(); ctx.roundRect(w*0.05, -h*0.65 - cycle*2, 6, 18, 3); ctx.fill();
+                } else if (skin.id === 'croc') {
+                    // Snout & Spikes
+                    ctx.fillStyle = '#15803d';
+                    for(let s = -2; s <= 2; s++) {
+                        ctx.fillRect(s*6, -h*0.4, 4, 4);
+                    }
+                } else if (skin.id === 'shark') {
+                    // Fin on back
+                    ctx.fillStyle = skin.secondary;
+                    ctx.beginPath(); ctx.moveTo(-w*0.1, -h*0.35); ctx.lineTo(-w*0.35, -h*0.6); ctx.lineTo(w*0.1, -h*0.35); ctx.fill();
+                } else if (skin.id === 'dino') {
+                    // Dino Spikes
+                    ctx.fillStyle = '#eab308';
+                    for(let d = -2; d <= 2; d++) {
+                        ctx.beginPath(); ctx.moveTo(-w*0.4, d*8); ctx.lineTo(-w*0.55, d*8 - 3); ctx.lineTo(-w*0.4, d*8 + 3); ctx.fill();
+                    }
+                }
+            }
+
+            ctx.shadowBlur = 0;
+        }
+
+        /* ==========================================================================
+           LEVEL GEOMETRY & GAME LOOP
+           ========================================================================== */
+        let levelPlatforms = [];
+        let levelHazards = [];
+        let levelPowerups = [];
+        let levelExit = null;
+        let particles = [];
+
+        let boss = {
+            x: 950, y: 450, width: 75, height: 95,
+            hp: 100, maxHp: 100, phase: 1, attackTimer: 0,
+            projectiles: []
+        };
+
+        function loadLevel(idx) {
+            currentLevelIdx = idx;
+            const lvl = LEVELS[idx];
+            player.reset(lvl.spawn.x, lvl.spawn.y);
+            levelPlatforms = []; levelHazards = []; levelPowerups = []; particles = []; boss.projectiles = [];
+
+            document.getElementById('level-title').innerText = lvl.name;
+            document.getElementById('level-objective').innerText = lvl.objective;
+
+            if (lvl.isBoss) {
+                document.getElementById('boss-hud').classList.remove('hidden');
+                boss.hp = 100; boss.phase = 1; updateBossHpUI();
+            } else {
+                document.getElementById('boss-hud').classList.add('hidden');
+            }
+
+            if (idx === 0) {
+                levelPlatforms = [
+                    { x: 0, y: 620, width: 360, height: 100 },
+                    { x: 430, y: 530, width: 140, height: 30 },
+                    { x: 630, y: 440, width: 160, height: 30 },
+                    { x: 850, y: 510, width: 130, height: 30 },
+                    { x: 1030, y: 620, width: 250, height: 100 }
+                ];
+                levelHazards = [
+                    { x: 360, y: 690, width: 70, height: 30, type: 'SPIKE' },
+                    { x: 680, y: 410, width: 30, height: 30, type: 'SAW', vx: 2.5, minX: 630, maxX: 760 }
+                ];
+                levelPowerups = [{ x: 480, y: 480, type: 'SPEED', collected: false }];
+            } else if (idx === 1) {
+                levelPlatforms = [
+                    { x: 0, y: 620, width: 250, height: 100 },
+                    { x: 320, y: 510, width: 110, height: 25 },
+                    { x: 490, y: 420, width: 110, height: 25 },
+                    { x: 660, y: 340, width: 130, height: 25 },
+                    { x: 850, y: 270, width: 110, height: 25 },
+                    { x: 1050, y: 250, width: 230, height: 470 }
+                ];
+                levelHazards = [
+                    { x: 250, y: 690, width: 800, height: 30, type: 'SPIKE' },
+                    { x: 510, y: 380, width: 30, height: 30, type: 'SAW', vx: 3.5, minX: 490, maxX: 580 }
+                ];
+                levelPowerups = [
+                    { x: 350, y: 460, type: 'HIGH_JUMP', collected: false },
+                    { x: 710, y: 290, type: 'SHRINK', collected: false }
+                ];
+            } else if (idx === 2) {
+                levelPlatforms = [
+                    { x: 0, y: 620, width: 200, height: 100 },
+                    { x: 260, y: 510, width: 120, height: 25 },
+                    { x: 440, y: 430, width: 100, height: 25 },
+                    { x: 300, y: 320, width: 110, height: 25 },
+                    { x: 500, y: 230, width: 150, height: 25 },
+                    { x: 730, y: 190, width: 110, height: 25 },
+                    { x: 950, y: 190, width: 330, height: 530 }
+                ];
+                levelHazards = [
+                    { x: 200, y: 690, width: 750, height: 30, type: 'SPIKE' },
+                    { x: 520, y: 190, width: 32, height: 32, type: 'SAW', vx: 4, minX: 500, maxX: 630 }
+                ];
+                levelPowerups = [{ x: 470, y: 380, type: 'GROW', collected: false }];
+            } else if (idx === 3) {
+                levelPlatforms = [
+                    { x: 0, y: 210, width: 250, height: 30 },
+                    { x: 300, y: 290, width: 110, height: 25 },
+                    { x: 480, y: 380, width: 130, height: 25 },
+                    { x: 660, y: 470, width: 110, height: 25 },
+                    { x: 820, y: 550, width: 110, height: 25 },
+                    { x: 1000, y: 630, width: 280, height: 90 }
+                ];
+                levelHazards = [
+                    { x: 0, y: 690, width: 1000, height: 30, type: 'SPIKE' },
+                    { x: 320, y: 250, width: 30, height: 30, type: 'SAW', vx: 5, minX: 300, maxX: 380 }
+                ];
+                levelPowerups = [{ x: 520, y: 330, type: 'FLY', collected: false }];
+            } else if (idx === 4) {
+                levelPlatforms = [
+                    { x: 0, y: 620, width: 1280, height: 100 },
+                    { x: 200, y: 450, width: 180, height: 25 },
+                    { x: 900, y: 450, width: 180, height: 25 },
+                    { x: 550, y: 330, width: 180, height: 25 }
+                ];
+                levelHazards = [];
+                levelPowerups = [
+                    { x: 250, y: 400, type: 'SPEED', collected: false },
+                    { x: 950, y: 400, type: 'HIGH_JUMP', collected: false }
+                ];
+            }
+
+            levelExit = lvl.exit;
+        }
+
+        function createParticles(x, y, color, count = 12) {
+            for (let i = 0; i < count; i++) {
+                particles.push({
+                    x, y,
+                    vx: (Math.random() - 0.5) * 7,
+                    vy: (Math.random() - 0.5) * 7,
+                    radius: Math.random() * 3.5 + 1.5,
+                    color, life: 35 + Math.random() * 20
+                });
+            }
+        }
+
+        function updateParticles() {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx; p.y += p.vy; p.life--;
+                if (p.life <= 0) particles.splice(i, 1);
+            }
+        }
+
+        function drawParticles() {
+            particles.forEach(p => {
+                ctx.fillStyle = p.color;
+                ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI*2); ctx.fill();
+            });
+        }
+
+        function updateBoss() {
+            if (LEVELS[currentLevelIdx].id !== 5 || gameState !== 'PLAYING') return;
+            boss.attackTimer++;
+
+            if (boss.hp > 65) {
+                boss.phase = 1;
+                if (boss.attackTimer % 85 === 0) {
+                    sound.playBossAttack();
+                    const angle = Math.atan2(player.y - boss.y, player.x - boss.x);
+                    for (let i = -1; i <= 1; i++) {
+                        boss.projectiles.push({
+                            x: boss.x, y: boss.y + 20,
+                            vx: Math.cos(angle + i*0.2) * 8.5,
+                            vy: Math.sin(angle + i*0.2) * 8.5,
+                            width: 16, height: 6, type: 'SCALPEL'
+                        });
+                    }
+                }
+            } else if (boss.hp > 30) {
+                boss.phase = 2;
+                if (boss.attackTimer % 110 === 0) {
+                    sound.playBossAttack();
+                    boss.projectiles.push({
+                        x: 0, y: player.y + player.height/2,
+                        width: 1280, height: 22, life: 42, type: 'LASER'
+                    });
+                }
+            } else {
+                boss.phase = 3;
+                if (boss.attackTimer % 65 === 0) {
+                    sound.playBossAttack();
+                    const angle = Math.atan2(player.y - boss.y, player.x - boss.x);
+                    boss.projectiles.push({
+                        x: boss.x, y: boss.y + 20,
+                        vx: Math.cos(angle) * 12, vy: Math.sin(angle) * 12,
+                        width: 18, height: 6, type: 'SCALPEL'
+                    });
+                }
+            }
+
+            document.getElementById('boss-phase-text').innerText = `Phase ${boss.phase}`;
+
+            for (let i = boss.projectiles.length - 1; i >= 0; i--) {
+                const proj = boss.projectiles[i];
+                if (proj.type === 'SCALPEL') {
+                    proj.x += proj.vx; proj.y += proj.vy;
+                    if (player.checkCollision(proj)) {
+                        handlePlayerDeath('Struck by Anh Minh\'s razor-sharp scalpel!');
+                        boss.projectiles.splice(i, 1);
+                        continue;
+                    }
+                } else if (proj.type === 'LASER') {
+                    proj.life--;
+                    if (proj.life > 0 && proj.life < 28 && player.checkCollision(proj)) {
+                        handlePlayerDeath('Incinerated by the surgical laser beam!');
+                    }
+                    if (proj.life <= 0) { boss.projectiles.splice(i, 1); continue; }
+                }
+
+                if (proj.x < -50 || proj.x > 1330 || proj.y < -50 || proj.y > 770) {
+                    boss.projectiles.splice(i, 1);
+                }
+            }
+
+            if (player.vy > 0 && player.checkCollision(boss)) {
+                boss.hp -= 15;
+                player.vy = -12.5;
+                sound.playPowerup();
+                screenShakeTime = 12;
+                createParticles(boss.x + boss.width/2, boss.y, '#ef4444', 25);
+                updateBossHpUI();
+
+                if (boss.hp <= 0) startCutscene('outro');
+            }
+        }
+
+        function updateBossHpUI() {
+            const pct = Math.max(0, (boss.hp / boss.maxHp) * 100);
+            document.getElementById('boss-hp-bar').style.width = `${pct}%`;
+        }
+
+        function handlePlayerDeath(msg) {
+            sound.playHurt();
+            screenShakeTime = 15;
+            createParticles(player.x + player.width/2, player.y + player.height/2, '#ef4444', 30);
+            lives--;
+            updateLivesUI();
+
+            if (lives <= 0) {
+                document.getElementById('pause-title').innerText = 'Game Over';
+                document.getElementById('pause-desc').innerText = msg || 'You succumbed to the nightmare.';
+                document.getElementById('btn-resume').classList.add('hidden');
+                document.getElementById('pause-modal').classList.remove('hidden');
+                gameState = 'GAME_OVER';
+            } else {
+                const lvl = LEVELS[currentLevelIdx];
+                player.reset(lvl.spawn.x, lvl.spawn.y);
+            }
+        }
+
+        function updateLivesUI() {
+            const container = document.getElementById('lives-container');
+            container.innerHTML = '';
+            for (let i = 0; i < 5; i++) {
+                const heart = document.createElement('i');
+                heart.className = `fa-solid fa-heart text-xs ${i < lives ? 'text-red-500' : 'text-slate-800'}`;
+                container.appendChild(heart);
+            }
+        }
+
+        function drawGame() {
+            ctx.save();
+            if (screenShakeTime > 0) {
+                ctx.translate((Math.random() - 0.5) * 8, (Math.random() - 0.5) * 8);
+                screenShakeTime--;
+            }
+
+            const lvl = LEVELS[currentLevelIdx];
+            const bgGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            bgGrad.addColorStop(0, lvl.bgGradient[0]);
+            bgGrad.addColorStop(1, lvl.bgGradient[1]);
+            ctx.fillStyle = bgGrad;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            if (lvl.rain) {
+                ctx.strokeStyle = 'rgba(148, 163, 184, 0.25)';
+                ctx.lineWidth = 1;
+                for (let i = 0; i < 45; i++) {
+                    const rx = (Math.sin(i * 99) * 0.5 + 0.5) * canvas.width;
+                    const ry = ((Date.now() * 0.6 + i * 50) % canvas.height);
+                    ctx.beginPath(); ctx.moveTo(rx, ry); ctx.lineTo(rx - 6, ry + 18); ctx.stroke();
+                }
+            }
+
+            levelPlatforms.forEach(p => {
+                ctx.fillStyle = '#1e293b'; ctx.strokeStyle = '#475569'; ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.roundRect(p.x, p.y, p.width, p.height, 6); ctx.fill(); ctx.stroke();
+            });
+
+            levelHazards.forEach(h => {
+                if (h.type === 'SAW') {
+                    h.x += h.vx;
+                    if (h.x < h.minX || h.x > h.maxX) h.vx *= -1;
+
+                    ctx.save();
+                    ctx.translate(h.x + h.width/2, h.y + h.height/2);
+                    ctx.rotate(Date.now() * 0.012);
+                    ctx.fillStyle = '#94a3b8'; ctx.beginPath(); ctx.arc(0, 0, h.width/2, 0, Math.PI*2); ctx.fill();
+                    ctx.strokeStyle = '#ef4444'; ctx.strokeRect(-h.width/2, -2, h.width, 4);
+                    ctx.restore();
+
+                    if (player.checkCollision(h)) handlePlayerDeath('Sliced by a spinning buzzsaw!');
+                } else if (h.type === 'SPIKE') {
+                    ctx.fillStyle = '#dc2626';
+                    const spikeCount = Math.floor(h.width / 15);
+                    for (let i = 0; i < spikeCount; i++) {
+                        ctx.beginPath();
+                        ctx.moveTo(h.x + i*15, h.y + h.height);
+                        ctx.lineTo(h.x + i*15 + 7.5, h.y);
+                        ctx.lineTo(h.x + (i+1)*15, h.y + h.height);
+                        ctx.fill();
+                    }
+                    if (player.checkCollision(h)) handlePlayerDeath('Impaled on deadly spikes!');
+                }
+            });
+
+            levelPowerups.forEach(pw => {
+                if (!pw.collected) {
+                    const bobY = pw.y + Math.sin(Date.now() * 0.005) * 6;
+                    ctx.fillStyle = '#fbbf24'; ctx.shadowBlur = 12; ctx.shadowColor = '#fbbf24';
+                    ctx.beginPath(); ctx.arc(pw.x + 15, bobY + 15, 12, 0, Math.PI*2); ctx.fill();
+                    ctx.shadowBlur = 0;
+
+                    if (player.x < pw.x + 30 && player.x + player.width > pw.x &&
+                        player.y < bobY + 30 && player.y + player.height > bobY) {
+                        pw.collected = true;
+                        player.applyBuff(pw.type);
+                    }
+                }
+            });
+
+            if (levelExit) {
+                ctx.fillStyle = '#dc2626'; ctx.shadowBlur = 16; ctx.shadowColor = '#ef4444';
+                ctx.fillRect(levelExit.x, levelExit.y, levelExit.width, levelExit.height);
+                ctx.shadowBlur = 0;
+
+                if (currentLevelIdx === 0) {
+                    ctx.fillStyle = '#ffffff'; ctx.fillRect(levelExit.x + 10, levelExit.y + 20, 20, 14);
+                }
+
+                if (player.checkCollision(levelExit)) {
+                    if (currentLevelIdx < LEVELS.length - 1) {
+                        if (currentLevelIdx === 3) startCutscene('preLevel5');
+                        else loadLevel(currentLevelIdx + 1);
+                    }
+                }
+            }
+
+            if (lvl.isBoss && boss.hp > 0) {
+                ctx.fillStyle = '#7c3aed'; ctx.shadowBlur = 22; ctx.shadowColor = '#a855f7';
+                ctx.fillRect(boss.x, boss.y, boss.width, boss.height);
+                ctx.shadowBlur = 0;
+
+                boss.projectiles.forEach(p => {
+                    if (p.type === 'SCALPEL') {
+                        ctx.fillStyle = '#f8fafc'; ctx.fillRect(p.x, p.y, p.width, p.height);
+                    } else if (p.type === 'LASER') {
+                        ctx.fillStyle = 'rgba(239, 68, 68, 0.85)'; ctx.shadowBlur = 18; ctx.shadowColor = '#ef4444';
+                        ctx.fillRect(p.x, p.y - p.height/2, p.width, p.height);
+                        ctx.shadowBlur = 0;
+                    }
+                });
+            }
+
+            player.draw();
+            drawParticles();
+            ctx.restore();
+        }
+
+        function startCutscene(key) {
+            currentCutsceneKey = key; cutsceneStep = 0; gameState = 'CUTSCENE';
+            document.getElementById('hud').classList.add('hidden');
+            document.getElementById('story-overlay').classList.remove('hidden');
+            renderCutsceneStep();
+        }
+
+        function renderCutsceneStep() {
+            const scriptList = STORY_SCRIPTS[currentCutsceneKey];
+            const item = scriptList[cutsceneStep];
+
+            document.getElementById('story-speaker').innerText = item.speaker;
+            document.getElementById('story-text').innerText = `"${item.text}"`;
+            document.getElementById('story-chapter-tag').innerText = item.tag;
+
+            const dotsContainer = document.getElementById('story-progress-dots');
+            dotsContainer.innerHTML = '';
+            scriptList.forEach((_, idx) => {
+                const dot = document.createElement('div');
+                dot.className = `w-2.5 h-2.5 rounded-full ${idx === cutsceneStep ? 'bg-red-500 w-6' : 'bg-slate-700'} transition-all`;
+                dotsContainer.appendChild(dot);
+            });
+        }
+
+        function nextStorySlide() {
+            const scriptList = STORY_SCRIPTS[currentCutsceneKey];
+            cutsceneStep++;
+            if (cutsceneStep >= scriptList.length) {
+                document.getElementById('story-overlay').classList.add('hidden');
+                if (currentCutsceneKey === 'intro') {
+                    loadLevel(0); gameState = 'PLAYING';
+                    document.getElementById('hud').classList.remove('hidden');
+                } else if (currentCutsceneKey === 'preLevel5') {
+                    loadLevel(4); gameState = 'PLAYING';
+                    document.getElementById('hud').classList.remove('hidden');
+                } else if (currentCutsceneKey === 'outro') {
+                    returnToMainMenu();
+                }
+            } else renderCutsceneStep();
+        }
+
+        function skipCutscene() {
+            cutsceneStep = STORY_SCRIPTS[currentCutsceneKey].length - 1;
+            nextStorySlide();
+        }
+
+        function startNewGame() {
+            lives = 5; updateLivesUI();
+            document.getElementById('main-menu').classList.add('hidden');
+            startCutscene('intro');
+        }
+
+        function togglePause() {
+            if (gameState === 'PLAYING') {
+                gameState = 'PAUSED';
+                document.getElementById('pause-title').innerText = 'Game Paused';
+                document.getElementById('pause-desc').innerText = 'Prepare yourself for what awaits in the shadows.';
+                document.getElementById('btn-resume').classList.remove('hidden');
+                document.getElementById('pause-modal').classList.remove('hidden');
+            } else if (gameState === 'PAUSED') {
+                gameState = 'PLAYING';
+                document.getElementById('pause-modal').classList.add('hidden');
+            }
+        }
+
+        function restartCurrentLevel() {
+            lives = 5; updateLivesUI();
+            document.getElementById('pause-modal').classList.add('hidden');
+            loadLevel(currentLevelIdx);
+            gameState = 'PLAYING';
+        }
+
+        function returnToMainMenu() {
+            document.getElementById('pause-modal').classList.add('hidden');
+            document.getElementById('story-overlay').classList.add('hidden');
+            document.getElementById('hud').classList.add('hidden');
+            document.getElementById('main-menu').classList.remove('hidden');
+            gameState = 'MENU';
+        }
+
+        function openLevelSelect() {
+            const container = document.getElementById('level-list-container');
+            container.innerHTML = '';
+            LEVELS.forEach((lvl, idx) => {
+                const card = document.createElement('div');
+                card.className = 'glass-btn p-4 rounded-xl cursor-pointer flex flex-col justify-between';
+                card.onclick = () => {
+                    closeModal('level-modal');
+                    document.getElementById('main-menu').classList.add('hidden');
+                    document.getElementById('hud').classList.remove('hidden');
+                    lives = 5; updateLivesUI();
+                    loadLevel(idx); gameState = 'PLAYING';
+                };
+                card.innerHTML = `
+                    <div class="font-bold text-slate-200 text-sm font-cinzel mb-1">${lvl.name}</div>
+                    <div class="text-xs text-slate-400 mb-2">${lvl.desc}</div>
+                    <div class="text-[10px] text-red-400 font-mono">Objective: ${lvl.objective}</div>
+                `;
+                container.appendChild(card);
+            });
+            document.getElementById('level-modal').classList.remove('hidden');
+        }
+
+        function openSkinMenu() {
+            const grid = document.getElementById('skin-grid');
+            grid.innerHTML = '';
+            SKINS.forEach(sk => {
+                const btn = document.createElement('button');
+                btn.className = `p-3.5 rounded-xl border flex flex-col items-center gap-2 transition-all ${currentSkin.id === sk.id ? 'bg-amber-950/80 border-amber-500 text-amber-200 shadow-lg' : 'bg-slate-900/60 border-slate-700 text-slate-300 hover:border-slate-500'}`;
+                btn.onclick = () => {
+                    currentSkin = sk;
+                    document.getElementById('current-skin-name').innerText = `Avatar: ${sk.name}`;
+                    openSkinMenu();
+                };
+                btn.innerHTML = `
+                    <i class="fa-solid ${sk.icon} text-2xl" style="color: ${sk.color}"></i>
+                    <span class="text-[11px] font-semibold text-center leading-tight">${sk.name}</span>
+                `;
+                grid.appendChild(btn);
+            });
+            document.getElementById('skin-modal').classList.remove('hidden');
+        }
+
+        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+        function gameLoop() {
+            animFrameCounter++;
+            if (gameState === 'PLAYING') {
+                player.update(levelPlatforms);
+                updateBoss();
+                updateParticles();
+                drawGame();
+            }
+            requestAnimationFrame(gameLoop);
+        }
+
+        window.onload = function() {
+            updateLivesUI();
+            requestAnimationFrame(gameLoop);
+        };
+    </script>
+</body>
+</html>
